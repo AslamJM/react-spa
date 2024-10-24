@@ -13,7 +13,7 @@ const LoginPage = () => {
   const token = "fry";
 
   return (
-    <div>
+    <div className="space-y-4">
       <Button onClick={() => login(user, token)}>Login</Button>
     </div>
   );
