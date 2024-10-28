@@ -1,5 +1,12 @@
+import { initAuth, refreshAccessToken } from "@/api/auth";
 import { User } from "@/types/user";
-import React, { createContext, useContext, useReducer, ReactNode } from "react";
+import {
+  createContext,
+  useReducer,
+  ReactNode,
+  useEffect,
+  useCallback,
+} from "react";
 
 export interface AuthState {
   isAuthenticated: boolean;
@@ -9,12 +16,14 @@ export interface AuthState {
 
 type AuthAction =
   | { type: "LOGIN"; payload: { user: AuthState["user"]; token: string } }
+  | { type: "REFRESH"; payload: { token: string } }
   | { type: "LOGOUT" };
 
 // Define the shape of the context
 interface AuthContextProps {
   state: AuthState;
-  login: (user: AuthState["user"], token: string) => void;
+  login: (user: AuthState["user"], token: string) => Promise<void>;
+  refreshToken: (token: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -26,7 +35,9 @@ const initialState: AuthState = {
 };
 
 // Create context
-const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+export const AuthContext = createContext<AuthContextProps | undefined>(
+  undefined
+);
 
 // Reducer function to update the state based on action type
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
@@ -43,6 +54,9 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         user: null,
         token: null,
       };
+    case "REFRESH":
+      return { ...state, token: action.payload.token };
+
     default:
       return state;
   }
@@ -52,7 +66,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  const login = (user: AuthState["user"], token: string) => {
+  const login = async (user: AuthState["user"], token: string) => {
     dispatch({ type: "LOGIN", payload: { user, token } });
   };
 
@@ -60,18 +74,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: "LOGOUT" });
   };
 
+  const refreshToken = async () => {
+    const token = await refreshAccessToken();
+    dispatch({ type: "REFRESH", payload: { token } });
+  };
+
+  const initializeAuth = useCallback(async () => {
+    try {
+      const { access_token, user } = await initAuth();
+      login(user, access_token);
+    } catch (error) {
+      console.error("Failed to initialize authentication:", error);
+      logout();
+    }
+  }, []);
+
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
   return (
-    <AuthContext.Provider value={{ state, login, logout }}>
+    <AuthContext.Provider value={{ state, login, logout, refreshToken }}>
       {children}
     </AuthContext.Provider>
   );
-};
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
 };

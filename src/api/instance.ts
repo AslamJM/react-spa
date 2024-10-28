@@ -3,7 +3,10 @@ import { getAccessToken, logout, refreshAccessToken } from './auth';
 
 const instance = axios.create({
     baseURL: "http://localhost:3000/api",
-    withCredentials: true
+    withCredentials: true,
+    headers: {
+        "Content-Type": "application/json"
+    }
 })
 
 instance.interceptors.request.use(
